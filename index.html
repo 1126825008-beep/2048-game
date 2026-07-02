@@ -29,6 +29,37 @@
     --tile-super: #3c3a32;
   }
 
+  /* Dark theme overrides */
+  [data-theme="dark"] {
+    --bg: #1a1520;
+    --board-bg: #2d2340;
+    --cell-empty: #3d3355;
+    --text-dark: #d4c8e8;
+    --text-light: #f0e8ff;
+    --button-bg: #6b5b8a;
+    --score-bg: #5a4a78;
+    --tile-2: #3a3050;
+    --tile-4: #4a3868;
+    --tile-8: #6b3fa0;
+    --tile-16: #8b4fc0;
+    --tile-32: #a05ad4;
+    --tile-64: #b86be0;
+    --tile-128: #7b5ea7;
+    --tile-256: #8b6ec0;
+    --tile-512: #9b7ed4;
+    --tile-1024: #ab8ee8;
+    --tile-2048: #c0a0f0;
+    --tile-super: #d4b8ff;
+    /* Override tile font colors for low-value tiles in dark mode */
+  }
+  [data-theme="dark"] .tile[data-value="2"],
+  [data-theme="dark"] .tile[data-value="4"] {
+    color: #d4c8e8;
+  }
+  [data-theme="dark"] .overlay {
+    background: rgba(26, 21, 32, 0.78);
+  }
+
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
     background: var(--bg);
@@ -119,6 +150,16 @@
     opacity: 0.4;
     cursor: default;
     transform: none;
+  }
+
+  .btn.theme-toggle {
+    flex: none;
+    min-width: auto;
+    padding: 6px 8px;
+    font-size: 20px;
+    line-height: 1;
+    background: transparent;
+    border-radius: 8px;
   }
 
   /* Board */
@@ -266,6 +307,7 @@
         <div class="score-label">最高</div>
         <div class="score-value" id="best">0</div>
       </div>
+      <button class="btn theme-toggle" id="themeToggle" title="切换主题">🌙</button>
     </div>
   </div>
 
@@ -352,10 +394,9 @@
   let animating = false;   // block input during animation
   let nextId    = 1;       // monotonic tile ID counter
 
-  // Undo
-  let prevGrid   = null;   // snapshot of grid before last move
-  let prevScore  = 0;
-  let canUndo    = false;
+  // Undo stack — up to 5 steps
+  let undoStack  = [];     // [{grid, score}, ...] newest at end
+  const MAX_UNDO = 5;
 
   // Tile DOM registry: id → element
   let tileMap = new Map();
@@ -391,6 +432,30 @@
 
   function saveBest() {
     try { localStorage.setItem('2048_best', best); } catch (e) {}
+  }
+
+  // Theme
+  function loadTheme() {
+    const saved = localStorage.getItem('2048_theme') || 'light';
+    document.documentElement.setAttribute('data-theme', saved);
+    updateThemeIcon(saved);
+  }
+
+  function saveTheme(theme) {
+    try { localStorage.setItem('2048_theme', theme); } catch (e) {}
+  }
+
+  function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    saveTheme(next);
+    updateThemeIcon(next);
+  }
+
+  function updateThemeIcon(theme) {
+    const btn = document.getElementById('themeToggle');
+    if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -748,26 +813,16 @@
   // ═══════════════════════════════════════════════════════════════
   //  UNDO
   // ═══════════════════════════════════════════════════════════════
-  function saveUndoState() {
-    prevGrid  = cloneGrid(grid);
-    prevScore = score;
-    canUndo   = true;
-    undoBtn.disabled = false;
-  }
-
   function undo() {
-    if (!canUndo || !prevGrid || animating) return;
+    if (undoStack.length === 0 || animating) return;
     ensureAudio();
-    grid      = prevGrid;
-    score     = prevScore;
-    prevGrid  = null;
-    prevScore = 0;
-    canUndo   = false;
-    undoBtn.disabled = true;
-    gameOver  = false;
+    const state = undoStack.pop();
+    grid  = state.grid;
+    score = state.score;
+    if (undoStack.length === 0) undoBtn.disabled = true;
+    gameOver = false;
     overlay.classList.remove('visible');
     updateScore();
-    // Static render — no animation for undo
     renderStatic(collectTiles(grid));
   }
 
@@ -778,7 +833,10 @@
     if (gameOver || animating) return;
     ensureAudio();
 
-    saveUndoState();
+    // Save state for undo
+    undoStack.push({ grid: cloneGrid(grid), score });
+    if (undoStack.length > MAX_UNDO) undoStack.shift();
+    undoBtn.disabled = false;
 
     const result = moveTracked(dir);
     if (!result) {
@@ -843,9 +901,7 @@
     won       = false;
     animating = false;
     nextId    = 1;
-    prevGrid  = null;
-    prevScore = 0;
-    canUndo   = false;
+    undoStack = [];
     undoBtn.disabled = true;
     overlay.classList.remove('visible');
     updateScore();
@@ -927,9 +983,14 @@
     undo();
   });
 
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    toggleTheme();
+  });
+
   // ═══════════════════════════════════════════════════════════════
   //  STARTUP
   // ═══════════════════════════════════════════════════════════════
+  loadTheme();
   loadBest();
   initGame();
 })();
