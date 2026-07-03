@@ -60,6 +60,36 @@
     background: rgba(26, 21, 32, 0.78);
   }
 
+  /* Cyan / teal skin */
+  [data-theme="cyan"] {
+    --bg: #f2f8f7;
+    --board-bg: #a8c8c8;
+    --cell-empty: #c8e0e0;
+    --text-dark: #3a5a58;
+    --text-light: #f5fcfc;
+    --button-bg: #5a9088;
+    --score-bg: #78a8a0;
+    --tile-2: #ddf0ee;
+    --tile-4: #c4e4e0;
+    --tile-8: #58b8a8;
+    --tile-16: #40a898;
+    --tile-32: #289888;
+    --tile-64: #108878;
+    --tile-128: #60c8b8;
+    --tile-256: #50b8a8;
+    --tile-512: #40a898;
+    --tile-1024: #289888;
+    --tile-2048: #108878;
+    --tile-super: #086860;
+  }
+  [data-theme="cyan"] .tile[data-value="2"],
+  [data-theme="cyan"] .tile[data-value="4"] {
+    color: #3a5a58;
+  }
+  [data-theme="cyan"] .overlay {
+    background: rgba(200, 224, 224, 0.73);
+  }
+
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
     background: var(--bg);
@@ -447,7 +477,9 @@
 
   function toggleTheme() {
     const current = document.documentElement.getAttribute('data-theme') || 'light';
-    const next = current === 'dark' ? 'light' : 'dark';
+    const order = ['light', 'dark', 'cyan'];
+    const idx = order.indexOf(current);
+    const next = order[(idx + 1) % order.length];
     document.documentElement.setAttribute('data-theme', next);
     saveTheme(next);
     updateThemeIcon(next);
@@ -455,7 +487,8 @@
 
   function updateThemeIcon(theme) {
     const btn = document.getElementById('themeToggle');
-    if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+    const icons = { light: '🌙', dark: '🌊', cyan: '☀️' };
+    if (btn) btn.textContent = icons[theme] || '🌙';
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -861,15 +894,10 @@
     // Fire render with animations
     renderAnimated(result.movements, result.merges, newTiles, () => {
       // Post-animation checks
-      // Check win (first 2048 merge)
+      // Track win silently, let game continue past 2048
       if (!won) {
         for (const m of result.merges) {
-          if (m.value >= 2048) {
-            won = true;
-            overlayText.textContent = '你赢了！';
-            overlay.classList.add('visible');
-            break;
-          }
+          if (m.value >= 2048) { won = true; break; }
         }
       }
 
